@@ -12,6 +12,8 @@ class Whitespace
       puts "#{ARGF.filename}: No such file or directory"
     end
 
+    @code.gsub!(/[^ \t\n]/, '') # 空白文字以外は排除
+
     # IMP表
     @imps = {
       's' => :stack_mnpl,
