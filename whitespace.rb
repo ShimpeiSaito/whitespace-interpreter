@@ -140,17 +140,17 @@ class Whitespace
       when :stack_mnpl
         case cmnd
         when :push
-          pass
+          Thread.pass
         when :duplicate
-          pass
+          Thread.pass
         when :n_duplicate
-          pass
+          Thread.pass
         when :switch
-          pass
+          Thread.pass
         when :discard
-          pass
+          Thread.pass
         when :n_discard
-          pass
+          Thread.pass
         else
           raise SyntaxError, "Error: #{cmnd} SyntaxError"
         end
@@ -158,15 +158,15 @@ class Whitespace
       when :arithmetic
         case cmnd
         when :add
-          pass
+          Thread.pass
         when :sub
-          pass
+          Thread.pass
         when :mul
-          pass
+          Thread.pass
         when :div
-          pass
+          Thread.pass
         when :rem
-          pass
+          Thread.pass
         else
           raise SyntaxError, "Error: #{cmnd} SyntaxError"
         end
@@ -174,9 +174,9 @@ class Whitespace
       when :heap_access
         case cmnd
         when :h_push
-          pass
+          Thread.pass
         when :h_pop
-          pass
+          Thread.pass
         else
           raise SyntaxError, "Error: #{cmnd} SyntaxError"
         end
@@ -184,19 +184,19 @@ class Whitespace
       when :flow_cntl
         case cmnd
         when :mark
-          pass
+          Thread.pass
         when :sub_start
-          pass
+          Thread.pass
         when :jump
-          pass
+          Thread.pass
         when :jump_zero
-          pass
+          Thread.pass
         when :jump_negative
-          pass
+          Thread.pass
         when :sub_end
-          pass
+          Thread.pass
         when :end
-          pass
+          Thread.pass
         else
           raise SyntaxError, "Error: #{cmnd} SyntaxError"
         end
@@ -204,13 +204,13 @@ class Whitespace
       when :io
         case cmnd
         when :output_char
-          pass
+          Thread.pass
         when :output_num
-          pass
+          Thread.pass
         when :input_char
-          pass
+          Thread.pass
         when :input_num
-          pass
+          Thread.pass
         else
           raise SyntaxError, "Error: #{cmnd} SyntaxError"
         end
@@ -219,7 +219,7 @@ class Whitespace
         raise SyntaxError, "Error: #{imp} SyntaxError"
       end
 
-      raise SyntaxError, 'SyntaxError' if @pc == @tokens.length
+      raise SyntaxError, 'SyntaxError' if @pc > @tokens.length
       break if cmnd == :end
     end
   end
