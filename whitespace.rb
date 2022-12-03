@@ -71,13 +71,25 @@ class Whitespace
     begin
       @tokenized_list = tokenize
     rescue StandardError => e
-      puts e.message.to_s
+      puts "Error: #{e.message}"
     end
 
-    # 確認用
-    # @tokenized_list.each_slice(3) { |t| p t.join(', ') }
-    # p stn_replace(@code)
-    p @tokenized_list
+    # 構文解析
+    @tokens = []
+    @tokenized_list.each_slice(3) do |a, b, c|
+      @tokens << [a, b, c]
+    end
+    p @tokens # 確認用
+
+    # 意味解析
+    $stdout.sync = true
+    $stdin.sync = true
+    @pc = 0
+    begin
+      evaluate
+    rescue SyntaxError => e
+      puts "Error: #{e.message}"
+    end
   end
 
   # 字句解析
@@ -113,6 +125,103 @@ class Whitespace
       break unless line.exist?(/ |\t|\n/)
     end
     result
+  end
+
+  # 意味解析
+  def evaluate
+    loop do
+      imp, cmnd, prmt = @tokens[@pc]
+      @pc += 1
+
+      # 各コマンド(cmnd)に応じた処理
+      puts "#{imp} #{cmnd} #{prmt}"
+
+      case imp
+      when :stack_mnpl
+        case cmnd
+        when :push
+          pass
+        when :duplicate
+          pass
+        when :n_duplicate
+          pass
+        when :switch
+          pass
+        when :discard
+          pass
+        when :n_discard
+          pass
+        else
+          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+        end
+
+      when :arithmetic
+        case cmnd
+        when :add
+          pass
+        when :sub
+          pass
+        when :mul
+          pass
+        when :div
+          pass
+        when :rem
+          pass
+        else
+          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+        end
+
+      when :heap_access
+        case cmnd
+        when :h_push
+          pass
+        when :h_pop
+          pass
+        else
+          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+        end
+
+      when :flow_cntl
+        case cmnd
+        when :mark
+          pass
+        when :sub_start
+          pass
+        when :jump
+          pass
+        when :jump_zero
+          pass
+        when :jump_negative
+          pass
+        when :sub_end
+          pass
+        when :end
+          pass
+        else
+          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+        end
+
+      when :io
+        case cmnd
+        when :output_char
+          pass
+        when :output_num
+          pass
+        when :input_char
+          pass
+        when :input_num
+          pass
+        else
+          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+        end
+
+      else
+        raise SyntaxError, "Error: #{imp} SyntaxError"
+      end
+
+      raise SyntaxError, 'SyntaxError' if @pc == @tokens.length
+      break if cmnd == :end
+    end
   end
 
   # 空白文字を文字に変換
@@ -166,3 +275,10 @@ end
 
 
 Whitespace.new
+
+#
+# stdout << stack.pop.chr
+#
+# heap[stack.pop] = stdin.getc.ord
+#
+#                   stdin.gets.to_i
