@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 require 'strscan'
 
 # This is whitespace interpreter
@@ -50,7 +48,7 @@ class Whitespace
 
     # フロー制御コマンド表
     @imp_n = {
-      'ss' => :mark,
+      'ss' => :label_mark,
       'st' => :sub_start,
       'sn' => :jump,
       'ts' => :jump_zero,
@@ -73,18 +71,20 @@ class Whitespace
     rescue StandardError => e
       puts "Error: #{e.message}"
     end
+    # p @tokenized_list
 
     # 構文解析
     @tokens = []
     @tokenized_list.each_slice(3) do |a, b, c|
       @tokens << [a, b, c]
     end
-    p @tokens # 確認用
+    # p @tokens # 確認用
 
     # 意味解析
     $stdout.sync = true
     $stdin.sync = true
     @pc = 0
+    @stack = []
     begin
       evaluate
     rescue SyntaxError => e
@@ -103,13 +103,13 @@ class Whitespace
         raise StandardError, 'undefined imp'
       end
 
-      repd_imp = stn_replace(imp_sp) # impを文字に変換
+      repd_imp = stn_replace_to_s(imp_sp) # impを文字に変換
       imp = @imps[repd_imp] # impをシンボルに変換
 
       # コマンド切り出し
       cmd_sp = get_command(line, repd_imp) # コマンドを文字に変換
 
-      command = instance_variable_get("@imp_#{repd_imp}")[stn_replace(cmd_sp)] # コマンドをシンボルに変換
+      command = instance_variable_get("@imp_#{repd_imp}")[stn_replace_to_s(cmd_sp)] # コマンドをシンボルに変換
 
       # パラメータ切り出し(必要なら)
       if parameter_check(imp, command)
@@ -118,7 +118,7 @@ class Whitespace
         end
 
         param_sp.chop! # 最後の改行を削除
-        param = stn_replace(param_sp) # パラメータを文字に変換
+        param = stn_replace_to_i(param_sp) # パラメータを01に変換
       end
 
       result << imp << command << param
@@ -134,41 +134,91 @@ class Whitespace
       @pc += 1
 
       # 各コマンド(cmnd)に応じた処理
-      puts "#{imp} #{cmnd} #{prmt}"
+      # puts "#{imp} #{cmnd} #{prmt}"
 
       case imp
       when :stack_mnpl
         case cmnd
         when :push
-          Thread.pass
+          @stack.push(prmt)
         when :duplicate
-          Thread.pass
+          @stack.push(@stack.last)
         when :n_duplicate
           Thread.pass
         when :switch
-          Thread.pass
+          @stack.push(@stack.slice!(-2))
         when :discard
-          Thread.pass
+          @stack.pop
         when :n_discard
           Thread.pass
         else
-          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+          raise SyntaxError, "#{cmnd} SyntaxError"
         end
 
       when :arithmetic
         case cmnd
         when :add
-          Thread.pass
+          f_elm = convert_to_decimal(@stack.pop)
+          s_elm = convert_to_decimal(@stack.pop)
+          result = s_elm + f_elm
+          if result.negative?
+            result = -result
+            result = "1#{result.to_s(2)}"
+          else
+            result = "0#{result.to_s(2)}"
+          end
+
+          @stack.push(result)
         when :sub
-          Thread.pass
+          f_elm = convert_to_decimal(@stack.pop)
+          s_elm = convert_to_decimal(@stack.pop)
+          result = s_elm - f_elm
+          if result.negative?
+            result = -result
+            result = "1#{result.to_s(2)}"
+          else
+            result = "0#{result.to_s(2)}"
+          end
+
+          @stack.push(result)
         when :mul
-          Thread.pass
+          f_elm = convert_to_decimal(@stack.pop)
+          s_elm = convert_to_decimal(@stack.pop)
+          result = s_elm * f_elm
+          if result.negative?
+            result = -result
+            result = "1#{result.to_s(2)}"
+          else
+            result = "0#{result.to_s(2)}"
+          end
+
+          @stack.push(result)
         when :div
-          Thread.pass
+          f_elm = convert_to_decimal(@stack.pop)
+          s_elm = convert_to_decimal(@stack.pop)
+          result = s_elm / f_elm
+          if result.negative?
+            result = -result
+            result = "1#{result.to_s(2)}"
+          else
+            result = "0#{result.to_s(2)}"
+          end
+
+          @stack.push(result)
         when :rem
-          Thread.pass
+          f_elm = convert_to_decimal(@stack.pop)
+          s_elm = convert_to_decimal(@stack.pop)
+          result = s_elm % f_elm
+          if result.negative?
+            result = -result
+            result = "1#{result.to_s(2)}"
+          else
+            result = "0#{result.to_s(2)}"
+          end
+
+          @stack.push(result)
         else
-          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+          raise SyntaxError, "#{cmnd} SyntaxError"
         end
 
       when :heap_access
@@ -178,54 +228,83 @@ class Whitespace
         when :h_pop
           Thread.pass
         else
-          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+          raise SyntaxError, "#{cmnd} SyntaxError"
         end
 
       when :flow_cntl
         case cmnd
-        when :mark
+        when :label_mark
           Thread.pass
         when :sub_start
           Thread.pass
         when :jump
-          Thread.pass
+          n = 0
+          @tokens.each do |i, c, p|
+            @pc = n + 1 if (c == :label_mark) && (p == prmt)
+            n += 1
+          end
         when :jump_zero
-          Thread.pass
+          if convert_to_decimal(@stack.pop).zero?
+            n = 0
+            @tokens.each do |i, c, p|
+              @pc = n + 1 if (c == :label_mark) && (p.to_s == prmt)
+              n += 1
+            end
+          end
         when :jump_negative
-          Thread.pass
+          if convert_to_decimal(@stack.pop).negative?
+            n = 0
+            @tokens.each do |i, c, p|
+              @pc = n + 1 if (c == :label_mark) && (p == prmt)
+              n += 1
+            end
+          end
         when :sub_end
           Thread.pass
         when :end
           Thread.pass
         else
-          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+          raise SyntaxError, " #{cmnd} SyntaxError"
         end
 
       when :io
         case cmnd
         when :output_char
-          Thread.pass
+          $stdout << convert_to_decimal(@stack.pop).chr
         when :output_num
-          Thread.pass
+          $stdout << convert_to_decimal(@stack.pop)
         when :input_char
           Thread.pass
         when :input_num
           Thread.pass
         else
-          raise SyntaxError, "Error: #{cmnd} SyntaxError"
+          raise SyntaxError, "#{cmnd} SyntaxError"
         end
 
       else
-        raise SyntaxError, "Error: #{imp} SyntaxError"
+        raise SyntaxError, "#{imp} SyntaxError"
       end
 
       raise SyntaxError, 'SyntaxError' if @pc > @tokens.length
       break if cmnd == :end
+
+      # p @stack
     end
   end
 
+  def convert_to_decimal(binary)
+    sign = binary.slice(0)
+
+    binary = binary[1..]
+    result = binary.to_i(2)
+
+    return -result if sign == '1'
+
+    result
+  end
+
   # 空白文字を文字に変換
-  def stn_replace(space)
+  def stn_replace_to_s(space)
     result = []
     space.chars.each do |sp|
       case sp
@@ -235,6 +314,20 @@ class Whitespace
         result << 't'
       when /\n/
         result << 'n'
+      end
+    end
+    result.join
+  end
+
+  # パラメータを数値に変換
+  def stn_replace_to_i(space)
+    result = []
+    space.chars.each do |sp|
+      case sp
+      when ' '
+        result << '0'
+      when /\t/
+        result << '1'
       end
     end
     result.join
