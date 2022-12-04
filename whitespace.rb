@@ -92,6 +92,7 @@ class Whitespace
       end
       h[k]
     end
+    @sub_origin = [] # サブルーチンの呼び出し位置
     begin
       evaluate
     rescue SyntaxError => e
@@ -139,7 +140,7 @@ class Whitespace
     loop do
       imp, cmnd, prmt = @tokens[@pc]
       @pc += 1
-      # puts "#{imp} #{cmnd} #{prmt}"
+      # puts "#{imp} #{cmnd} #{prmt}" # 確認用
 
       case imp
       when :stack_mnpl
@@ -149,13 +150,13 @@ class Whitespace
         when :duplicate
           @stack.push(@stack.last)
         when :n_duplicate
-          @stack.push(convert_to_decimal(prmt))
+          @stack.push(@stack[convert_to_decimal(prmt)])
         when :switch
           @stack.push(@stack.slice!(-2))
         when :discard
           @stack.pop
         when :n_discard
-          @stack.pop(convert_to_decimal(prmt))
+          @stack.delete_at(convert_to_decimal(prmt))
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
@@ -166,31 +167,33 @@ class Whitespace
 
         case cmnd
         when :add
-          result = s_elm + f_elm
+          ans = s_elm + f_elm
         when :sub
-          result = s_elm - f_elm
+          ans = s_elm - f_elm
         when :mul
-          result = s_elm * f_elm
+          ans = s_elm * f_elm
         when :div
-          result = s_elm / f_elm
+          ans = s_elm / f_elm
         when :rem
-          result = s_elm % f_elm
+          ans = s_elm % f_elm
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
 
-        if result.negative?
-          result = -result
-          result = "1#{result.to_s(2)}"
+        if ans.negative?
+          ans = -ans
+          result = "1#{ans.to_s(2)}"
         else
-          result = "0#{result.to_s(2)}"
+          result = "0#{ans.to_s(2)}"
         end
         @stack.push(result)
 
       when :heap_access
         case cmnd
         when :h_push
-          @heap[@stack.pop] = prmt
+          value = @stack.pop
+          key = @stack.pop
+          @heap[key] = value
         when :h_pop
           @stack.push(@heap[@stack.pop])
         else
@@ -202,7 +205,8 @@ class Whitespace
         when :label_mark
           @labels[prmt] = @pc
         when :sub_start
-          Thread.pass
+          @sub_origin.push(@pc)
+          @pc = @labels[prmt]
         when :jump
           @pc = @labels[prmt]
         when :jump_zero
@@ -210,7 +214,7 @@ class Whitespace
         when :jump_negative
           @pc = @labels[prmt] if convert_to_decimal(@stack.pop).negative?
         when :sub_end
-          Thread.pass
+          @pc = @sub_origin.pop
         when :end
           break
         else
@@ -224,9 +228,15 @@ class Whitespace
         when :output_num
           $stdout << convert_to_decimal(@stack.pop)
         when :input_char
-          @heap[@stack.pop] = $stdin.getc.ord
+          @heap[@stack.pop] = "0#{$stdin.getc.ord.to_s(2)}"
         when :input_num
-          @heap[@stack.pop] = $stdin.gets.to_i
+          input = $stdin.gets.to_i
+          @heap[@stack.pop] = if input.negative?
+                                input = -input
+                                "1#{input.to_s(2)}"
+                              else
+                                "0#{input.to_s(2)}"
+                              end
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
@@ -237,6 +247,7 @@ class Whitespace
       raise SyntaxError, 'SyntaxError' if @pc >= @tokens.length
 
       # p @stack # 確認用
+      # p @heap # 確認用
     end
   end
 
