@@ -85,6 +85,7 @@ class Whitespace
     $stdin.sync = true
     @pc = 0
     @stack = []
+    @heap = Hash.new
     begin
       evaluate
     rescue SyntaxError => e
@@ -132,8 +133,6 @@ class Whitespace
     loop do
       imp, cmnd, prmt = @tokens[@pc]
       @pc += 1
-
-      # 各コマンド(cmnd)に応じた処理
       # puts "#{imp} #{cmnd} #{prmt}"
 
       case imp
@@ -144,89 +143,50 @@ class Whitespace
         when :duplicate
           @stack.push(@stack.last)
         when :n_duplicate
-          Thread.pass
+          @stack.push(convert_to_decimal(prmt))
         when :switch
           @stack.push(@stack.slice!(-2))
         when :discard
           @stack.pop
         when :n_discard
-          Thread.pass
+          @stack.pop(convert_to_decimal(prmt))
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
 
       when :arithmetic
+        f_elm = convert_to_decimal(@stack.pop)
+        s_elm = convert_to_decimal(@stack.pop)
+
         case cmnd
         when :add
-          f_elm = convert_to_decimal(@stack.pop)
-          s_elm = convert_to_decimal(@stack.pop)
           result = s_elm + f_elm
-          if result.negative?
-            result = -result
-            result = "1#{result.to_s(2)}"
-          else
-            result = "0#{result.to_s(2)}"
-          end
-
-          @stack.push(result)
         when :sub
-          f_elm = convert_to_decimal(@stack.pop)
-          s_elm = convert_to_decimal(@stack.pop)
           result = s_elm - f_elm
-          if result.negative?
-            result = -result
-            result = "1#{result.to_s(2)}"
-          else
-            result = "0#{result.to_s(2)}"
-          end
-
-          @stack.push(result)
         when :mul
-          f_elm = convert_to_decimal(@stack.pop)
-          s_elm = convert_to_decimal(@stack.pop)
           result = s_elm * f_elm
-          if result.negative?
-            result = -result
-            result = "1#{result.to_s(2)}"
-          else
-            result = "0#{result.to_s(2)}"
-          end
-
-          @stack.push(result)
         when :div
-          f_elm = convert_to_decimal(@stack.pop)
-          s_elm = convert_to_decimal(@stack.pop)
           result = s_elm / f_elm
-          if result.negative?
-            result = -result
-            result = "1#{result.to_s(2)}"
-          else
-            result = "0#{result.to_s(2)}"
-          end
-
-          @stack.push(result)
         when :rem
-          f_elm = convert_to_decimal(@stack.pop)
-          s_elm = convert_to_decimal(@stack.pop)
           result = s_elm % f_elm
-          if result.negative?
-            result = -result
-            result = "1#{result.to_s(2)}"
-          else
-            result = "0#{result.to_s(2)}"
-          end
-
-          @stack.push(result)
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
 
+        if result.negative?
+          result = -result
+          result = "1#{result.to_s(2)}"
+        else
+          result = "0#{result.to_s(2)}"
+        end
+        @stack.push(result)
+
       when :heap_access
         case cmnd
         when :h_push
-          Thread.pass
+          @heap[@stack.pop] = prmt
         when :h_pop
-          Thread.pass
+          @stack.push(@heap[@stack.pop])
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
@@ -262,7 +222,7 @@ class Whitespace
         when :sub_end
           Thread.pass
         when :end
-          Thread.pass
+          break
         else
           raise SyntaxError, " #{cmnd} SyntaxError"
         end
@@ -274,9 +234,9 @@ class Whitespace
         when :output_num
           $stdout << convert_to_decimal(@stack.pop)
         when :input_char
-          Thread.pass
+          @heap[@stack.pop] = $stdin.getc.ord
         when :input_num
-          Thread.pass
+          @heap[@stack.pop] = $stdin.gets.to_i
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
@@ -286,21 +246,9 @@ class Whitespace
       end
 
       raise SyntaxError, 'SyntaxError' if @pc > @tokens.length
-      break if cmnd == :end
 
       # p @stack
     end
-  end
-
-  def convert_to_decimal(binary)
-    sign = binary.slice(0)
-
-    binary = binary[1..]
-    result = binary.to_i(2)
-
-    return -result if sign == '1'
-
-    result
   end
 
   # 空白文字を文字に変換
@@ -319,7 +267,7 @@ class Whitespace
     result.join
   end
 
-  # パラメータを数値に変換
+  # パラメータを01に変換
   def stn_replace_to_i(space)
     result = []
     space.chars.each do |sp|
@@ -364,14 +312,19 @@ class Whitespace
 
     false
   end
+
+  # 2進数を10進数に変換
+  def convert_to_decimal(binary)
+    sign = binary.slice(0)
+
+    binary = binary[1..]
+    result = binary.to_i(2)
+
+    return -result if sign == '1'
+
+    result
+  end
 end
 
 
 Whitespace.new
-
-#
-# stdout << stack.pop.chr
-#
-# heap[stack.pop] = stdin.getc.ord
-#
-#                   stdin.gets.to_i
