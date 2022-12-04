@@ -1,0 +1,47 @@
+shimpei♔: 🐕 whitespace-intarpreter  ▶ ruby whitespace.rb count.ws                                                                                                                [🐈意味解析の実装]
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+
+shimpei♔: 🐕 whitespace-intarpreter  ▶ ruby whitespace.rb hello.ws                                                                                                                [🐈意味解析の実装]
+Hello, World!
+
+shimpei♔: 🐕 whitespace-intarpreter  ▶ ruby whitespace.rb name.ws                                                                                                                 [🐈意味解析の実装]
+Please enter your name: Shimpei
+Hello Shimpei
+
+
+shimpei♔: 🐕 whitespace-intarpreter  ▶ ruby whitespace.rb calculator.ws                                                                                                           [🐈意味解析の実装]
+Enter some numbers, then -1 to finish
+Number:12
+Number:34
+Number:100004
+Number:2222
+Number:-1
+Total is 102272
+
+shimpei♔: 🐕 whitespace-intarpreter  ▶ ruby whitespace.rb fibonacci.ws                                                                                                            [🐈意味解析の実装]
+How many? 8
+1
+1
+2
+3
+5
+8
+13
+21
+34
+55
+
+shimpei♔: 🐕 whitespace-intarpreter  ▶ ruby whitespace.rb fact.ws                                                                                                                 [🐈意味解析の実装]
+Enter a number: 25
+25! = 15511210043330985984000000
+
+shimpei♔: 🐕 whitespace-intarpreter  ▶                                                                                                                                            [🐈意味解析の実装]

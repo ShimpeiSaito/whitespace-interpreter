@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 require 'strscan'
 
 # This is whitespace interpreter
@@ -50,7 +48,7 @@ class Whitespace
 
     # フロー制御コマンド表
     @imp_n = {
-      'ss' => :mark,
+      'ss' => :label_mark,
       'st' => :sub_start,
       'sn' => :jump,
       'ts' => :jump_zero,
@@ -67,17 +65,39 @@ class Whitespace
       'tt' => :input_num
     }
 
-    # 字句解析
+    ## 字句解析
     begin
       @tokenized_list = tokenize
     rescue StandardError => e
-      puts e.message.to_s
+      puts "Error: #{e.message}"
     end
+    # p @tokenized_list # 確認用
 
-    # 確認用
-    # @tokenized_list.each_slice(3) { |t| p t.join(', ') }
-    # p stn_replace(@code)
-    p @tokenized_list
+    ## 構文解析
+    @tokens = []
+    @tokenized_list.each_slice(3) do |a, b, c|
+      @tokens << [a, b, c]
+    end
+    # p @tokens # 確認用
+
+    ## 意味解析
+    $stdout.sync = true
+    $stdin.sync = true
+    @pc = 0 # 現在の位置
+    @stack = [] # スタック
+    @heap = {} # ヒープ
+    @labels = Hash.new do |h, k| # ジャンプラベル
+      @tokens.each_with_index do |(imp, cmnd, prmt), idx|
+        h[prmt] = idx if cmnd == :label_mark
+      end
+      h[k]
+    end
+    @sub_origin = [] # サブルーチンの呼び出し位置
+    begin
+      evaluate
+    rescue SyntaxError => e
+      puts "Error: #{e.message}"
+    end
   end
 
   # 字句解析
@@ -91,13 +111,13 @@ class Whitespace
         raise StandardError, 'undefined imp'
       end
 
-      repd_imp = stn_replace(imp_sp) # impを文字に変換
+      repd_imp = stn_replace_to_s(imp_sp) # impを文字に変換
       imp = @imps[repd_imp] # impをシンボルに変換
 
       # コマンド切り出し
       cmd_sp = get_command(line, repd_imp) # コマンドを文字に変換
 
-      command = instance_variable_get("@imp_#{repd_imp}")[stn_replace(cmd_sp)] # コマンドをシンボルに変換
+      command = instance_variable_get("@imp_#{repd_imp}")[stn_replace_to_s(cmd_sp)] # コマンドをシンボルに変換
 
       # パラメータ切り出し(必要なら)
       if parameter_check(imp, command)
@@ -106,7 +126,7 @@ class Whitespace
         end
 
         param_sp.chop! # 最後の改行を削除
-        param = stn_replace(param_sp) # パラメータを文字に変換
+        param = stn_replace_to_i(param_sp) # パラメータを01に変換
       end
 
       result << imp << command << param
@@ -115,8 +135,124 @@ class Whitespace
     result
   end
 
+  # 意味解析
+  def evaluate
+    loop do
+      imp, cmnd, prmt = @tokens[@pc]
+      @pc += 1
+      # puts "#{imp} #{cmnd} #{prmt}" # 確認用
+
+      case imp
+      when :stack_mnpl
+        case cmnd
+        when :push
+          @stack.push(prmt)
+        when :duplicate
+          @stack.push(@stack.last)
+        when :n_duplicate
+          @stack.push(@stack[convert_to_decimal(prmt)])
+        when :switch
+          @stack.push(@stack.slice!(-2))
+        when :discard
+          @stack.pop
+        when :n_discard
+          @stack.delete_at(convert_to_decimal(prmt))
+        else
+          raise SyntaxError, "#{cmnd} SyntaxError"
+        end
+
+      when :arithmetic
+        f_elm = convert_to_decimal(@stack.pop)
+        s_elm = convert_to_decimal(@stack.pop)
+
+        case cmnd
+        when :add
+          ans = s_elm + f_elm
+        when :sub
+          ans = s_elm - f_elm
+        when :mul
+          ans = s_elm * f_elm
+        when :div
+          ans = s_elm / f_elm
+        when :rem
+          ans = s_elm % f_elm
+        else
+          raise SyntaxError, "#{cmnd} SyntaxError"
+        end
+
+        if ans.negative?
+          ans = -ans
+          result = "1#{ans.to_s(2)}"
+        else
+          result = "0#{ans.to_s(2)}"
+        end
+        @stack.push(result)
+
+      when :heap_access
+        case cmnd
+        when :h_push
+          value = @stack.pop
+          key = @stack.pop
+          @heap[key] = value
+        when :h_pop
+          @stack.push(@heap[@stack.pop])
+        else
+          raise SyntaxError, "#{cmnd} SyntaxError"
+        end
+
+      when :flow_cntl
+        case cmnd
+        when :label_mark
+          @labels[prmt] = @pc
+        when :sub_start
+          @sub_origin.push(@pc)
+          @pc = @labels[prmt]
+        when :jump
+          @pc = @labels[prmt]
+        when :jump_zero
+          @pc = @labels[prmt] if convert_to_decimal(@stack.pop).zero?
+        when :jump_negative
+          @pc = @labels[prmt] if convert_to_decimal(@stack.pop).negative?
+        when :sub_end
+          @pc = @sub_origin.pop
+        when :end
+          break
+        else
+          raise SyntaxError, " #{cmnd} SyntaxError"
+        end
+
+      when :io
+        case cmnd
+        when :output_char
+          $stdout << convert_to_decimal(@stack.pop).chr
+        when :output_num
+          $stdout << convert_to_decimal(@stack.pop)
+        when :input_char
+          @heap[@stack.pop] = "0#{$stdin.getc.ord.to_s(2)}"
+        when :input_num
+          input = $stdin.gets.to_i
+          @heap[@stack.pop] = if input.negative?
+                                input = -input
+                                "1#{input.to_s(2)}"
+                              else
+                                "0#{input.to_s(2)}"
+                              end
+        else
+          raise SyntaxError, "#{cmnd} SyntaxError"
+        end
+      else
+        raise SyntaxError, "#{imp} SyntaxError"
+      end
+
+      raise SyntaxError, 'SyntaxError' if @pc >= @tokens.length
+
+      # p @stack # 確認用
+      # p @heap # 確認用
+    end
+  end
+
   # 空白文字を文字に変換
-  def stn_replace(space)
+  def stn_replace_to_s(space)
     result = []
     space.chars.each do |sp|
       case sp
@@ -126,6 +262,20 @@ class Whitespace
         result << 't'
       when /\n/
         result << 'n'
+      end
+    end
+    result.join
+  end
+
+  # パラメータを01に変換
+  def stn_replace_to_i(space)
+    result = []
+    space.chars.each do |sp|
+      case sp
+      when ' '
+        result << '0'
+      when /\t/
+        result << '1'
       end
     end
     result.join
@@ -162,7 +312,18 @@ class Whitespace
 
     false
   end
-end
 
+  # 2進数を10進数に変換
+  def convert_to_decimal(binary)
+    sign = binary.slice(0)
+
+    binary = binary[1..]
+    result = binary.to_i(2)
+
+    return -result if sign == '1'
+
+    result
+  end
+end
 
 Whitespace.new
