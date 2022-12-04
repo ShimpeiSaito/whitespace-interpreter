@@ -65,27 +65,33 @@ class Whitespace
       'tt' => :input_num
     }
 
-    # 字句解析
+    ## 字句解析
     begin
       @tokenized_list = tokenize
     rescue StandardError => e
       puts "Error: #{e.message}"
     end
-    # p @tokenized_list
+    # p @tokenized_list # 確認用
 
-    # 構文解析
+    ## 構文解析
     @tokens = []
     @tokenized_list.each_slice(3) do |a, b, c|
       @tokens << [a, b, c]
     end
     # p @tokens # 確認用
 
-    # 意味解析
+    ## 意味解析
     $stdout.sync = true
     $stdin.sync = true
-    @pc = 0
-    @stack = []
-    @heap = Hash.new
+    @pc = 0 # 現在の位置
+    @stack = [] # スタック
+    @heap = {} # ヒープ
+    @labels = Hash.new do |h, k| # ジャンプラベル
+      @tokens.each_with_index do |(imp, cmnd, prmt), idx|
+        h[prmt] = idx if cmnd == :label_mark
+      end
+      h[k]
+    end
     begin
       evaluate
     rescue SyntaxError => e
@@ -194,31 +200,15 @@ class Whitespace
       when :flow_cntl
         case cmnd
         when :label_mark
-          Thread.pass
+          @labels[prmt] = @pc
         when :sub_start
           Thread.pass
         when :jump
-          n = 0
-          @tokens.each do |i, c, p|
-            @pc = n + 1 if (c == :label_mark) && (p == prmt)
-            n += 1
-          end
+          @pc = @labels[prmt]
         when :jump_zero
-          if convert_to_decimal(@stack.pop).zero?
-            n = 0
-            @tokens.each do |i, c, p|
-              @pc = n + 1 if (c == :label_mark) && (p.to_s == prmt)
-              n += 1
-            end
-          end
+          @pc = @labels[prmt] if convert_to_decimal(@stack.pop).zero?
         when :jump_negative
-          if convert_to_decimal(@stack.pop).negative?
-            n = 0
-            @tokens.each do |i, c, p|
-              @pc = n + 1 if (c == :label_mark) && (p == prmt)
-              n += 1
-            end
-          end
+          @pc = @labels[prmt] if convert_to_decimal(@stack.pop).negative?
         when :sub_end
           Thread.pass
         when :end
@@ -240,14 +230,13 @@ class Whitespace
         else
           raise SyntaxError, "#{cmnd} SyntaxError"
         end
-
       else
         raise SyntaxError, "#{imp} SyntaxError"
       end
 
-      raise SyntaxError, 'SyntaxError' if @pc > @tokens.length
+      raise SyntaxError, 'SyntaxError' if @pc >= @tokens.length
 
-      # p @stack
+      # p @stack # 確認用
     end
   end
 
@@ -325,6 +314,5 @@ class Whitespace
     result
   end
 end
-
 
 Whitespace.new
